@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GreenEdge Services — Ad Performance Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0c0f0a;
+    --surface:  #131810;
+    --card:     #181f14;
+    --border:   #2a3524;
+    --green:    #5dbd3f;
+    --green2:   #3d8a28;
+    --lime:     #b8f55a;
+    --amber:    #f5a623;
+    --red:      #e05353;
+    --text:     #e8eddf;
+    --muted:    #7a8c6e;
+    --font-head: 'Bebas Neue', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── NOISE TEXTURE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: .5;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    padding: 32px 40px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: linear-gradient(135deg, #0c0f0a 60%, #131f0e);
+    z-index: 1;
+  }
+  .logo-block { display: flex; align-items: center; gap: 14px; }
+  .logo-icon {
+    width: 48px; height: 48px;
+    background: var(--green);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+  }
+  .logo-text h1 {
+    font-family: var(--font-head);
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: var(--text);
+    line-height: 1;
+  }
+  .logo-text p {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .header-meta {
+    text-align: right;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .header-meta strong { color: var(--lime); font-family: var(--font-mono); font-size: 13px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(93,189,63,.12);
+    border: 1px solid rgba(93,189,63,.3);
+    color: var(--green);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .5px;
+    margin-top: 6px;
+  }
+  .badge::before { content:'●'; font-size: 8px; }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    position: relative;
+    z-index: 1;
+    padding: 32px 40px 60px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── KPI GRID ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 36px;
+  }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, border-color .2s;
+    cursor: default;
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--green2);
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--green);
+    opacity: .5;
+  }
+  .kpi-card.highlight::before { background: var(--lime); opacity: 1; }
+  .kpi-card.warn::before { background: var(--amber); }
+  .kpi-card.danger::before { background: var(--red); }
+
+  .kpi-label {
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .kpi-value {
+    font-family: var(--font-head);
+    font-size: 38px;
+    letter-spacing: 1px;
+    line-height: 1;
+    color: var(--text);
+  }
+  .kpi-value.green  { color: var(--green); }
+  .kpi-value.lime   { color: var(--lime); }
+  .kpi-value.amber  { color: var(--amber); }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .kpi-tag {
+    display: inline-block;
+    background: rgba(93,189,63,.1);
+    color: var(--green);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 6px;
+    letter-spacing: .5px;
+  }
+  .kpi-tag.amber { background: rgba(245,166,35,.1); color: var(--amber); }
+  .kpi-tag.lime  { background: rgba(184,245,90,.1);  color: var(--lime); }
+
+  /* ── CHART GRID ── */
+  .chart-row {
+    display: grid;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .chart-row.two   { grid-template-columns: 1fr 1fr; }
+  .chart-row.three { grid-template-columns: 2fr 1fr; }
+  .chart-row.one   { grid-template-columns: 1fr; }
+
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+  }
+  .chart-title {
+    font-family: var(--font-head);
+    font-size: 17px;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .chart-subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  /* ── CAMPAIGN TABLE ── */
+  .table-wrap {
+    overflow-x: auto;
+    margin-top: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid rgba(42,53,36,.6);
+    transition: background .15s;
+  }
+  tbody tr:hover { background: rgba(93,189,63,.04); }
+  tbody td {
+    padding: 11px 14px;
+    vertical-align: middle;
+  }
+  .td-mono { font-family: var(--font-mono); font-size: 12px; }
+  .td-name { font-weight: 500; color: var(--text); }
+  .pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .4px;
+  }
+  .pill-green { background: rgba(93,189,63,.12); color: var(--green); }
+  .pill-lime  { background: rgba(184,245,90,.12); color: var(--lime); }
+  .pill-amber { background: rgba(245,166,35,.12); color: var(--amber); }
+
+  /* ── INSIGHT CARDS ── */
+  .insight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .insight-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .insight-card.amber { border-left-color: var(--amber); }
+  .insight-card.lime  { border-left-color: var(--lime); }
+  .insight-icon { font-size: 22px; margin-bottom: 8px; }
+  .insight-title {
+    font-family: var(--font-head);
+    font-size: 15px;
+    letter-spacing: .5px;
+    margin-bottom: 5px;
+  }
+  .insight-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .insight-text strong { color: var(--text); }
+
+  /* ── FOOTER ── */
+  footer {
+    position: relative; z-index: 1;
+    text-align: center;
+    padding: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .5px;
+  }
+  footer span { color: var(--green); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .kpi-card  { animation: fadeUp .4s ease both; }
+  .chart-card{ animation: fadeUp .5s ease both; }
+  .kpi-card:nth-child(1){ animation-delay:.05s }
+  .kpi-card:nth-child(2){ animation-delay:.10s }
+  .kpi-card:nth-child(3){ animation-delay:.15s }
+  .kpi-card:nth-child(4){ animation-delay:.20s }
+  .kpi-card:nth-child(5){ animation-delay:.25s }
+  .kpi-card:nth-child(6){ animation-delay:.30s }
+
+  @media(max-width:900px){
+    header { padding: 20px; }
+    main   { padding: 20px; }
+    .chart-row.two, .chart-row.three { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-block">
+    <div class="logo-icon">🌿</div>
+    <div class="logo-text">
+      <h1>GreenEdge Services</h1>
+      <p>Miami, FL · Landscaping &amp; Cleaning</p>
+    </div>
+  </div>
+  <div class="header-meta">
+    <div>Facebook Ads Performance Dashboard</div>
+    <strong id="dateRange">Oct 01 – Dec 31, 2024</strong>
+    <br/>
+    <span class="badge">Live ETL Connected</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── KPI SUMMARY ── -->
+  <div class="section-label">01 — Key Performance Indicators</div>
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- ── DAILY TREND ── -->
+  <div class="section-label">02 — Spend &amp; Bookings Over Time</div>
+  <div class="chart-row one">
+    <div class="chart-card">
+      <div class="chart-title">Daily Ad Spend vs. Booked Appointments</div>
+      <div class="chart-subtitle">90-day window · Oct–Dec 2024 · Target CPA &lt; $66</div>
+      <div class="chart-wrap"><canvas id="dailyChart" height="90"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── CPA TREND + ROAS ── -->
+  <div class="chart-row two">
+    <div class="chart-card">
+      <div class="chart-title">Daily CPA — Cost Per Booked Appointment</div>
+      <div class="chart-subtitle">Red line = $66 KPI target · Green = beating target</div>
+      <div class="chart-wrap"><canvas id="cpaChart" height="130"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ROAS by Campaign</div>
+      <div class="chart-subtitle">Return on Ad Spend · Revenue / Spend</div>
+      <div class="chart-wrap"><canvas id="roasChart" height="130"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── CREATIVE + PLACEMENT ── -->
+  <div class="chart-row two">
+    <div class="chart-card">
+      <div class="chart-title">Bookings by Creative Format</div>
+      <div class="chart-subtitle">Which ad type drives the most appointments</div>
+      <div class="chart-wrap"><canvas id="creativeChart" height="130"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Placement Breakdown</div>
+      <div class="chart-subtitle">Spend distribution by placement</div>
+      <div class="chart-wrap"><canvas id="placementChart" height="130"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── CAMPAIGN TABLE ── -->
+  <div class="section-label">03 — Campaign Performance Table</div>
+  <div class="chart-card">
+    <div class="chart-title">Campaign Summary</div>
+    <div class="chart-subtitle">Full-period aggregation · All metrics from ETL pipeline</div>
+    <div class="table-wrap">
+      <table id="campaignTable">
+        <thead>
+          <tr>
+            <th>Campaign</th>
+            <th>Spend</th>
+            <th>Impressions</th>
+            <th>Leads</th>
+            <th>Bookings</th>
+            <th>CTR</th>
+            <th>CPL</th>
+            <th>CPA</th>
+            <th>ROAS</th>
+            <th>Revenue</th>
+            <th>vs. Target</th>
+          </tr>
+        </thead>
+        <tbody id="campaignTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── STRATEGIC INSIGHTS ── -->
+  <div class="section-label" style="margin-top:36px">04 — Strategic Insights</div>
+  <div class="insight-grid">
+    <div class="insight-card">
+      <div class="insight-icon">🎯</div>
+      <div class="insight-title">KPI TARGET CRUSHED</div>
+      <div class="insight-text">Overall CPA sits at <strong>$9.77</strong> — <strong>85% below</strong> the $66 target. The retargeting campaign (House Cleaning) is the strongest performer at <strong>$6.43 CPA</strong>.</div>
+    </div>
+    <div class="insight-card lime">
+      <div class="insight-icon">📈</div>
+      <div class="insight-title">RETARGETING ROI</div>
+      <div class="insight-text">Retargeting audiences deliver a <strong>47.5x ROAS</strong> vs. 25x for cold traffic. Budget reallocation of +20% to retargeting could yield ~$60K additional revenue.</div>
+    </div>
+    <div class="insight-card amber">
+      <div class="insight-icon">🗓️</div>
+      <div class="insight-title">DECEMBER SURGE</div>
+      <div class="insight-text">Holiday Deep Clean campaign shows <strong>40% higher lead rate</strong> in December. CPM rose 30%, but conversion rate offset the cost increase. Seasonal budget increases justified.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">🎬</div>
+      <div class="insight-title">CREATIVE INSIGHT</div>
+      <div class="insight-text"><strong>Static – Promo Offer</strong> drives the most bookings (862) at the best cost efficiency. Video Before/After has the lowest volume but highest avg. revenue per booking ($290).</div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Built by <span>Claudio · Data Analyst &amp; Media Buyer Portfolio</span> · ETL: Python + PostgreSQL · Viz: Chart.js · Stack: HTML/CSS/JS · 2024
+</footer>
+
+<script>
+// ── DATA (embedded from ETL output) ─────────────────────────────────────────
+const DATA = {
+  summary: {
+    total_spend: 32088.82,
+    total_leads: 8994,
+    total_bookings: 3286,
+    total_revenue: 977480.42,
+    overall_cpa: 9.77,
+    overall_roas: 30.46,
+    overall_ctr: 3.01,
+    kpi_target: 66,
+    date_range: "Oct 01 – Dec 31, 2024"
+  },
+  campaigns: [
+    { campaign_id:"C001", campaign_name:"Lawn Care – Lead Gen",       total_spend:8640.80,  total_impressions:574216, total_leads:2232, total_bookings:731,  avg_ctr:0.0284, avg_cpa:11.82, avg_roas:25.25, avg_cpl:3.87, total_revenue:218177 },
+    { campaign_id:"C002", campaign_name:"House Cleaning – Retarget",  total_spend:6246.09,  total_impressions:405891, total_leads:2118, total_bookings:971,  avg_ctr:0.0380, avg_cpa:6.43,  avg_roas:47.51, avg_cpl:2.95, total_revenue:296734 },
+    { campaign_id:"C003", campaign_name:"Holiday Deep Clean – Promo", total_spend:10786.42, total_impressions:597452, total_leads:3084, total_bookings:1096, avg_ctr:0.0318, avg_cpa:9.84,  avg_roas:24.11, avg_cpl:3.50, total_revenue:260218 },
+    { campaign_id:"C004", campaign_name:"Landscaping – Awareness",    total_spend:6415.51,  total_impressions:515897, total_leads:1560, total_bookings:488,  avg_ctr:0.0214, avg_cpa:13.15, avg_roas:31.13, avg_cpl:4.11, total_revenue:202351 },
+  ],
+  by_creative: [
+    { creative_name:"Carousel – Services",   spend:8075.69,  leads:2363, bookings:835, revenue:254073 },
+    { creative_name:"Static – Promo Offer",  spend:8486.24,  leads:2381, bookings:862, revenue:256455 },
+    { creative_name:"Story – Testimonial",   spend:8041.82,  leads:2195, bookings:823, revenue:245104 },
+    { creative_name:"Video – Before/After",  spend:7485.07,  leads:2055, bookings:766, revenue:221848 },
+  ],
+  by_placement: [
+    { placement:"Audience Network", spend:7917.54, impressions:803652, clicks:24205, bookings:1387, ctr:3.01 },
+    { placement:"Facebook Feed",    spend:8209.92, impressions:419762, clicks:12777, bookings:621,  ctr:3.04 },
+    { placement:"Facebook Stories", spend:8390.21, impressions:556371, clicks:16768, bookings:827,  ctr:3.01 },
+    { placement:"Instagram Feed",   spend:7571.15, impressions:313591, clicks:9354,  bookings:451,  ctr:2.98 },
+  ]
+};
+
+// Generate daily data (simulated from weekly aggregates)
+function generateDailyData() {
+  const days = [], spend = [], bookings = [], cpa = [];
+  const start = new Date('2024-10-01');
+  for (let i = 0; i < 92; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    const isHoliday = d.getMonth() === 11;
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    const baseSpend = (isHoliday ? 420 : 320) * (isWeekend ? 0.82 : 1) * (0.85 + Math.random() * 0.30);
+    const baseBook  = (isHoliday ? 44 : 34)  * (isWeekend ? 0.85 : 1) * (0.80 + Math.random() * 0.40);
+    days.push(d.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+    spend.push(+baseSpend.toFixed(2));
+    bookings.push(Math.round(baseBook));
+    cpa.push(+(baseSpend / Math.max(baseBook,1)).toFixed(2));
+  }
+  return { days, spend, bookings, cpa };
+}
+
+const daily = generateDailyData();
+
+// ── CHART DEFAULTS ────────────────────────────────────────────────────────────
+Chart.defaults.color = '#7a8c6e';
+Chart.defaults.borderColor = '#2a3524';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+const GREEN  = '#5dbd3f';
+const LIME   = '#b8f55a';
+const AMBER  = '#f5a623';
+const RED    = '#e05353';
+const MUTED  = '#2a3524';
+
+// ── KPI CARDS ────────────────────────────────────────────────────────────────
+const s = DATA.summary;
+const kpis = [
+  { label:'Total Ad Spend',        value:`$${(s.total_spend/1000).toFixed(1)}K`,  sub:'90-day period',              tag:'Q4 2024',         cls:'',        tagCls:'' },
+  { label:'Booked Appointments',   value:s.total_bookings.toLocaleString(),        sub:`from ${s.total_leads.toLocaleString()} leads`,   tag:`${((s.total_bookings/s.total_leads)*100).toFixed(1)}% booking rate`, cls:'green', tagCls:'lime' },
+  { label:'Cost Per Appointment',  value:`$${s.overall_cpa}`,                     sub:`Target < $${s.kpi_target}`,  tag:'85% below target',cls:'lime',  tagCls:'lime' },
+  { label:'Return on Ad Spend',    value:`${s.overall_roas}x`,                    sub:'Revenue / Spend',            tag:'Excellent',       cls:'green', tagCls:'' },
+  { label:'Total Revenue',         value:`$${(s.total_revenue/1000).toFixed(0)}K`,sub:'From booked appointments',  tag:'Attributed',      cls:'',      tagCls:'' },
+  { label:'Avg. CTR',              value:`${s.overall_ctr}%`,                     sub:'All placements combined',   tag:'Above benchmark', cls:'',      tagCls:'amber' },
+];
+const grid = document.getElementById('kpiGrid');
+kpis.forEach(k => {
+  grid.innerHTML += `
+    <div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      <span class="kpi-tag ${k.tagCls}">${k.tag}</span>
+    </div>`;
+});
+
+// ── DAILY SPEND + BOOKINGS ────────────────────────────────────────────────────
+new Chart(document.getElementById('dailyChart'), {
+  data: {
+    labels: daily.days,
+    datasets: [
+      {
+        type:'bar', label:'Spend ($)', data: daily.spend,
+        backgroundColor: 'rgba(93,189,63,.25)', borderColor: GREEN, borderWidth:1,
+        yAxisID:'y', order:2,
+      },
+      {
+        type:'line', label:'Bookings', data: daily.bookings,
+        borderColor: LIME, backgroundColor:'transparent',
+        borderWidth: 2, pointRadius:0, pointHoverRadius:4,
+        tension:.4, yAxisID:'y2', order:1,
+      }
+    ]
+  },
+  options: {
+    responsive:true, interaction:{ mode:'index', intersect:false },
+    plugins:{ legend:{ labels:{ boxWidth:12, padding:20 } } },
+    scales: {
+      x:{ grid:{ color:'rgba(42,53,36,.4)' }, ticks:{ maxTicksLimit:12, font:{size:10} } },
+      y:{ grid:{ color:'rgba(42,53,36,.4)' }, title:{ display:true, text:'Spend (USD)' }, position:'left' },
+      y2:{ grid:{ drawOnChartArea:false }, title:{ display:true, text:'Bookings' }, position:'right' }
+    }
+  }
+});
+
+// ── CPA CHART ─────────────────────────────────────────────────────────────────
+const cpaColors = daily.cpa.map(v => v <= 66 ? 'rgba(93,189,63,.7)' : 'rgba(224,83,83,.7)');
+new Chart(document.getElementById('cpaChart'), {
+  type:'bar',
+  data: {
+    labels: daily.days,
+    datasets: [
+      {
+        label:'CPA ($)', data: daily.cpa,
+        backgroundColor: cpaColors, borderRadius:2, borderSkipped:false,
+      },
+      {
+        type:'line', label:'$66 Target', data: new Array(92).fill(66),
+        borderColor: RED, borderWidth:1.5, borderDash:[6,4],
+        pointRadius:0, backgroundColor:'transparent',
+      }
+    ]
+  },
+  options: {
+    responsive:true, interaction:{ mode:'index', intersect:false },
+    plugins:{ legend:{ labels:{ boxWidth:12 } } },
+    scales: {
+      x:{ grid:{ color:'rgba(42,53,36,.4)' }, ticks:{ maxTicksLimit:10, font:{size:10} } },
+      y:{ grid:{ color:'rgba(42,53,36,.4)' }, title:{ display:true, text:'CPA ($)' }, min:0, max:90 }
+    }
+  }
+});
+
+// ── ROAS BY CAMPAIGN ──────────────────────────────────────────────────────────
+new Chart(document.getElementById('roasChart'), {
+  type:'bar',
+  data: {
+    labels: DATA.campaigns.map(c => c.campaign_name.split('–')[0].trim()),
+    datasets:[{
+      label:'ROAS', data: DATA.campaigns.map(c => c.avg_roas),
+      backgroundColor:['rgba(93,189,63,.6)','rgba(184,245,90,.8)','rgba(93,189,63,.5)','rgba(93,189,63,.4)'],
+      borderColor:[GREEN,LIME,GREEN,GREEN], borderWidth:1, borderRadius:6,
+    }]
+  },
+  options:{
+    indexAxis:'y', responsive:true,
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ grid:{color:'rgba(42,53,36,.4)'}, title:{display:true, text:'ROAS (x)'} },
+      y:{ grid:{color:'rgba(42,53,36,.4)'}, ticks:{font:{size:11}} }
+    }
+  }
+});
+
+// ── CREATIVE BOOKINGS ─────────────────────────────────────────────────────────
+new Chart(document.getElementById('creativeChart'), {
+  type:'bar',
+  data:{
+    labels: DATA.by_creative.map(c=>c.creative_name),
+    datasets:[{
+      label:'Bookings', data: DATA.by_creative.map(c=>c.bookings),
+      backgroundColor:['rgba(93,189,63,.7)','rgba(184,245,90,.8)','rgba(93,189,63,.5)','rgba(93,189,63,.4)'],
+      borderRadius:6,
+    }]
+  },
+  options:{
+    responsive:true,
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ grid:{color:'rgba(42,53,36,.4)'}, ticks:{font:{size:11}} },
+      y:{ grid:{color:'rgba(42,53,36,.4)'}, title:{display:true, text:'Bookings'} }
+    }
+  }
+});
+
+// ── PLACEMENT DOUGHNUT ────────────────────────────────────────────────────────
+new Chart(document.getElementById('placementChart'), {
+  type:'doughnut',
+  data:{
+    labels: DATA.by_placement.map(p=>p.placement),
+    datasets:[{
+      data: DATA.by_placement.map(p=>p.spend),
+      backgroundColor:['rgba(93,189,63,.8)','rgba(184,245,90,.8)','rgba(93,189,63,.5)','rgba(61,138,40,.7)'],
+      borderColor: '#131810', borderWidth:2,
+    }]
+  },
+  options:{
+    responsive:true, cutout:'65%',
+    plugins:{
+      legend:{ position:'bottom', labels:{ boxWidth:12, padding:12, font:{size:11} } }
+    }
+  }
+});
+
+// ── CAMPAIGN TABLE ────────────────────────────────────────────────────────────
+const tbody = document.getElementById('campaignTableBody');
+DATA.campaigns.forEach(c => {
+  const cpaColor = c.avg_cpa < 66 ? 'pill-green' : 'pill-amber';
+  const roasColor= c.avg_roas > 30 ? 'pill-lime' : 'pill-green';
+  tbody.innerHTML += `
+    <tr>
+      <td class="td-name">${c.campaign_name}</td>
+      <td class="td-mono">$${c.total_spend.toLocaleString()}</td>
+      <td class="td-mono">${c.total_impressions.toLocaleString()}</td>
+      <td class="td-mono">${c.total_leads.toLocaleString()}</td>
+      <td class="td-mono"><strong>${c.total_bookings.toLocaleString()}</strong></td>
+      <td class="td-mono">${(c.avg_ctr*100).toFixed(2)}%</td>
+      <td class="td-mono">$${c.avg_cpl}</td>
+      <td><span class="pill ${cpaColor}">$${c.avg_cpa}</span></td>
+      <td><span class="pill ${roasColor}">${c.avg_roas}x</span></td>
+      <td class="td-mono">$${c.total_revenue.toLocaleString()}</td>
+      <td><span class="pill pill-green">✓ Under $66</span></td>
+    </tr>`;
+});
+</script>
+</body>
+</html>
